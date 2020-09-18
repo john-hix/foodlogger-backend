@@ -47,7 +47,7 @@ class Users implements RouteController {
         }
     }
     
-    // Allows User creation without authentication
+    // Create user on our end if the auth0 id is valid 
     async create(req: restify.Request, res: restify.Response, next: restify.Next) {
         try {
             const aId: string = req.body?.auth0Id;
@@ -69,7 +69,7 @@ class Users implements RouteController {
             res.send(201, ourUser.toJSON());
             next();
         } catch(e) {
-            if (e.statusCode && e.statusCode === 400) {
+            if (e.statusCode && e.statusCode === 400) { // auth0 management client error
                 next(new InvalidContentError('Invalid auth0Id'));
             }
             next(e);

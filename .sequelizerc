@@ -1,0 +1,10 @@
+const path = require('path');
+
+// NOTE: this is for inside the docker container;
+// the seq-cli-config.js file must be copied into the
+// save directory as this file.
+module.exports = {
+  'env': 'development',
+  'config': path.resolve('seq-cli.js'),
+  'migrations-path': path.resolve('migrations')
+};

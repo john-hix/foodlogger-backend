@@ -1,0 +1,2297 @@
+openapi: 3.0.0
+info:
+  title: Nutrition Tracker Web API
+  version: 1.0.0
+  description: This is an open source REST-inspired backend for food logging.
+paths:
+  '/howdy':
+    get:
+      summary: Checks if the server is alive.
+      description: "Should check if app is actually ready to serve requests, such as ensuring it can connect to the db and cache."
+      tags:
+      - monitoring
+      responses:
+        '200':
+          description: Server is up! 👍
+        '500':
+          description: Server is up but not doing well. 🤒
+
+  '/token':
+    post:
+      summary: "JWT grant route"
+      description: "JWT login route"
+      tags:
+      - authorization
+      requestBody:
+        description: "Login credentials"
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: integer
+                password:
+                  type: string
+                  format: plaintext
+      responses:
+        '200':
+          description: "Includes access and refresh tokens"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/tokenGrant'
+        '400':
+          description: "Wrong password or malformed request body"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorValidation'
+                
+  '/token/refresh':
+    post:
+      summary: "JWT refresh route"
+      description: "Refresh a token."
+      tags:
+      - authorization
+      responses:
+        '200':
+          description: "New access and refresh tokens"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/tokenGrant'
+        '401':
+          description: "Token has been revoked. User must reauthenticate"
+  '/users':
+    summary: For user-related operations, not including login
+    post:
+      summary: Register a user
+      tags:
+      - user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserCreate"
+      responses:
+        '201':
+          description: The user that was created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+        '400':
+          description: "Client did not pass validation"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorValidation'
+
+
+        '500':
+          $ref: '#/components/responses/InternalError'
+  '/users/{userId}':
+    summary: CRU users
+    description: Operations concerning a single user
+    parameters:
+      - $ref: '#/components/parameters/userIdPath'
+    head:
+      summary: Check for front-end safe user info
+      description: head semantics.
+      tags:
+      - user
+      parameters:
+        - $ref: '#/components/parameters/userIdPath'
+      responses:
+        '204':
+          description: "The user with the specified ID exists."
+        '401':
+          $ref: '#/components/responses/NotAuthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    get:
+      summary: Get front-end safe user info
+      description: Only allows access to current authenticated user's data.
+      tags:
+      - user
+      parameters:
+        - $ref: '#/components/parameters/userIdPath'
+      responses:
+        '200':
+          description: the user with the specified ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+        '401':
+          $ref: '#/components/responses/NotAuthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    put:
+      summary: Replace all API-accessible data about a user
+      tags:
+        - user
+      parameters: 
+        - $ref: '#/components/parameters/userIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserCreate"
+      responses:
+        '200':
+          description: OK, user updated, response shows new user state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+        '401':
+          $ref: '#/components/responses/NotAuthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    patch:
+      summary: Replace certain data about a user
+      tags:
+        - user
+      parameters: 
+        - $ref: '#/components/parameters/userIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserPatch"
+      responses:
+        '200':
+          description: OK, user updated, response shows new user state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+        '400':
+          description: Failed validation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorValidation'
+
+        '401':
+          $ref: '#/components/responses/NotAuthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      summary: Deactivate a user
+      description: Perform a soft-delete on a user.
+      tags:
+      - user
+      parameters:
+        - $ref: '#/components/parameters/userIdPath'
+      responses:
+        '204':
+          description: User has been deleted
+        '401':
+          $ref: '#/components/responses/NotAuthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  '/user/{userId}/goal':
+    parameters:
+    - $ref: '#/components/parameters/userIdPath'
+    - $ref: '#/components/parameters/expand'
+    get:
+      summary: Get a user's current nutritional goals
+      description: "<p>Gets the specified user's personal nutritional goals. Until further notice, users may only access their own goals.<p/>Available expansions: <code>nutrient_goals.nutrient</code>"
+      tags:
+      - user
+      - goals
+      - expandable
+      responses:
+        '200':
+          description: A goal object
+          headers:
+            X-Invalid-expansions:
+              description: List of expansions that were not valid paths in the response object
+              schema:
+                type: array
+                items:
+                  type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Goal'
+              example:
+                $ref: '#/components/examples/Goal'
+        '401':
+          $ref: '#/components/responses/NotAuthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      summary: Create/update a user's goals
+      description: Sets a user's nutritional goals. Until further notice, users may only set their own goals.
+      tags:
+      - user
+      - goals
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GoalPut"
+      responses:
+        '201':
+          description: Goal was modified and new goal state is returned
+          content:
+            application/json:
+              schema:
+               $ref: '#/components/schemas/Goal'
+        '400':
+          description: The request failed validation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorValidation'
+        '401':
+          $ref: '#/components/responses/NotAuthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    put:
+      summary: Create/update a user's goals
+      description: Sets a user's nutritional goals. Until further notice, users may only set their own goals.
+      tags:
+      - user
+      - goals
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GoalPut"
+      responses:
+        '201':
+          description: Goal was modified and new goal state is returned
+          content:
+            application/json:
+              schema:
+               $ref: '#/components/schemas/Goal'
+        '400':
+          description: The request failed validation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorValidation'
+        '401':
+          $ref: '#/components/responses/NotAuthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+          
+  '/user/{userId}/goal_deltas':
+    parameters:
+    - $ref: '#/components/parameters/userIdPath'
+    get:
+      summary: Get historical changes to a user's nutritional goals
+      description: "<p>Gets changes made to the user's goals in the specified range, a useful annotation when generating reports.</p>"
+      tags:
+      - user
+      - goals
+      - expandable
+      parameters:
+      - $ref: '#/components/parameters/from_date_required'
+      - $ref: '#/components/parameters/to_date'
+      responses:
+        '200':
+          description: Goal deltas found and presented
+          headers:
+            X-Invalid-expansions:
+              description: List of expansions that were not valid paths in the response object
+              schema:
+                type: array
+                items:
+                  type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArrayUserGoalDelta'
+              example:
+                $ref: '#/components/examples/user_goal_delta_not_expanded'
+
+        '401':
+          $ref: '#/components/responses/NotAuthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "No goal deltas found for this period."
+        '500':
+          $ref: '#/components/responses/InternalError'
+  '/user/{userId}/meal_times':
+    parameters:
+    - $ref: '#/components/parameters/userIdPath'
+    get:
+      summary: Get the times at which this user eats meals.
+      description: "Not everyone eats the same number of meals at the same time of day. This collection shows this user's daily meals/snacks"
+      tags:
+      - user
+      - meal_times
+      parameters:
+      - $ref: '#/components/parameters/show_deleted'
+      - $ref: '#/components/parameters/limit'
+      - $ref: '#/components/parameters/page'
+      responses:
+        '200':
+          description: An array of meal time objects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserMealTimeGet'
+        '401':
+          $ref: '#/components/responses/NotAuthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      summary: "Create a meal time for this user"
+      description: "Create a meal time."
+      tags:
+      - user
+      - meal_times
+      requestBody:
+        description: Info for the new meal time
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserMealTimePut'
+      responses:
+        '201':
+          description: Meal time created
+          content:
+            application/json:
+              schema:
+               $ref: '#/components/schemas/UserMealTimeGet'
+        '400':
+          description: The request failed validation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorValidation'
+        '401':
+          $ref: '#/components/responses/NotAuthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  '/user/{userId}/meal_times/{mealTimeId}':
+    parameters:
+    - $ref: '#/components/parameters/userIdPath'
+    - $ref: '#/components/parameters/mealTimeIdPath'
+    get:
+      summary: Get a single meal time object
+      description: "When the user eats the specified meal object"
+      tags:
+      - user
+      - meal_times
+      parameters:
+      - $ref: '#/components/parameters/show_deleted'
+      responses:
+        '200':
+          description: A meal time object
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserMealTimeGet'
+        '401':
+          $ref: '#/components/responses/NotAuthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    put:
+      summary: "Overwrite a user meal time"
+      description: ""
+      tags:
+      - user
+      - meal_times
+      requestBody:
+        description: Info for the new meal time
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserMealTimePut'
+      responses:
+        '200':
+          description: Meal time updated
+          content:
+            application/json:
+              schema:
+               $ref: '#/components/schemas/UserMealTimeGet'
+        '400':
+          description: The request failed validation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorValidation'
+        '401':
+          $ref: '#/components/responses/NotAuthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    patch:
+      summary: "Replace certain fields on meal time"
+      description: "Replaces only the field provided."
+      tags:
+      - user
+      - meal_times
+      requestBody:
+        description: Info for the new meal time
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserMealTimePut'
+      responses:
+        '200':
+          description: Meal time updated
+          content:
+            application/json:
+              schema:
+               $ref: '#/components/schemas/UserMealTimeGet'
+        '400':
+          description: The request failed validation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorValidation'
+        '401':
+          $ref: '#/components/responses/NotAuthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      summary: Soft-delete a meal time
+      description: Soft delete a meal time.
+      tags:
+      - user
+      - meal_times
+      parameters:
+        - $ref: '#/components/parameters/userIdPath'
+      responses:
+        '204':
+          description: User has been deleted
+        '401':
+          $ref: '#/components/responses/NotAuthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  '/user/{userId}/fav_foods':
+    parameters:
+    - $ref: '#/components/parameters/userIdPath'
+    - $ref: '#/components/parameters/show_deleted'
+    - $ref: '#/components/parameters/limit'
+    - $ref: '#/components/parameters/page'
+    get:
+      summary: "Get the user's favorited foods"
+      description: "The foods which the user has favorited."
+      tags:
+      - user
+      - food
+      responses:
+        '200':
+          description: "A list of foods, ours or third party"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FoodListMixed'
+        '204':
+          description: "User does not have any favorite foods"
+        '401':
+          $ref: '#/components/responses/NotAuthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      summary: "Favorite several foods"
+      tags:
+      - user
+      - food
+      requestBody:
+        description: "A list of food IDs to add to this user's favorite foods list"
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/FoodId'
+      responses:
+        '204':
+          description: "The food was added to the user's favorites list"
+        '400':
+          description: "In addition to other possible `400`s, it is possible food ID does not reference an existing food."
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Error'
+                - type: object
+                  properties:
+                    invalid_food_ids:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/FoodId'
+                      example: [9, -1]
+        '401':
+          $ref: '#/components/responses/NotAuthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  '/user/{userId}/fav_foods/{foodId}':
+    parameters:
+    - $ref: '#/components/parameters/userIdPath'
+    - $ref: '#/components/parameters/foodIdPath'
+    post:
+        summary: "Favorite a food"
+        tags:
+        - user
+        - food
+        requestBody:
+          description: "A list of food IDs to add to this user's favorite foods list"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FoodId'
+        responses:
+          '201':
+            description: "The food was added to the user's favorites list"
+          '401':
+            $ref: '#/components/responses/NotAuthorized'
+          '403':
+            $ref: '#/components/responses/Forbidden'
+          '404':
+            description: "The food ID does not reference an existing food"
+          '500':
+            $ref: '#/components/responses/InternalError' 
+    delete:
+      summary: "Unfavorite a food"
+      tags:
+      - user
+      - food
+      description: "Removes a food from the user's list of favorite foods. This is idempotent; multiple calls will result in a `204` every time."
+      responses:
+        '204':
+          description: "The food is not/no longer is a favorite."
+        '401':
+          $ref: '#/components/responses/NotAuthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError' 
+  '/user/{userId}/recent_food':
+    get:
+      summary: "Get a user's recent foods"
+      description: "'Recent' foods are those added to a meal by the user. `from_date` defaults to today - 1 week"
+      tags:
+      - user
+      - food
+      parameters:
+      - $ref: '#/components/parameters/userIdPath'
+      - $ref: '#/components/parameters/to_date'
+      - $ref: '#/components/parameters/from_date'
+      responses:
+        '200':
+          description: "A list of food objects, `food` and `cloud_food`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FoodListMixed'
+        '204':
+          description: "User has no recent foods. Encourage them to start logging!"
+        '401':
+          $ref: '#/components/responses/NotAuthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    
+  '/goal_templates':
+    head:
+      description: "See GET"
+      tags:
+      - goals
+      responses:
+        '204':
+          description: "All is well"
+    get:
+      summary: Popular diet goals, predefined
+      description: "<p>Gets a list of templates from which users may choose to start their personal goals</p> Available expansions: <code>nutrient_goals.nutrient</code>"
+      tags:
+      - goals
+      parameters:
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/page'
+      responses:
+        '200':
+          description: A list of templates
+          headers:
+            X-Invalid-expansions:
+              description: List of expansions that were not valid paths in the response object
+              schema:
+                type: array
+                items:
+                  type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GoalTemplate"
+              examples:
+                expanded:
+                  $ref: '#/components/examples/goal_template'
+
+  '/food':
+    get:
+      summary: "Discover foods and their serving sizes"
+      description: "Search our data and a 3rd party API for food. 3rd party results require including the user-selected measure in whatever subsequent request is made because nutrient information is calculated server-side. Our server can handle getting `cloud_foods`'s nutrients if a `measure` and quantity are specified."
+      tags:
+      - food
+      parameters:
+      - $ref: '#/components/parameters/foodSearchphrase'
+      - $ref: '#/components/parameters/foodCategoriesIds'
+      - $ref: '#/components/parameters/foodCategoryLabels'
+      - $ref: '#/components/parameters/foodSearchPaired'
+      - $ref: '#/components/parameters/limit'
+      - $ref: '#/components/parameters/page'
+
+      responses:
+        '200':
+          description: "A list of food items matching the criteria. `cloud_foods` will not have all nutrients listed. (The top result, if a `cloud_food`, will have macronutrients listed.)"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FoodSearchResult'
+        '404':
+          description: "No foods matched the search criteria"
+    post:
+      summary: "Create a food item"
+      description: "Creates a food item and marks it for moderator review."
+      tags:
+      - food
+      responses:
+        '201':
+          description: "The created food object. Food was created and flagged for review."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FoodPost'
+
+      
+  '/food/{foodId}':
+    parameters:
+    - $ref: '#/components/parameters/foodIdPath'
+    get:
+      summary: "Get food a item and its nutrients"
+      description: "<p>If food is a <code>cloud_food</code>, the <code>ed_measure</code> and <code>ed_measure_qual</code> are required.</p><p>Foods added by our users must pass moderation in order to be publicly available on the platform. If the authenticated user did not create the food and it has not been moderated, a <code>404</code> is returned. If the authenticated user created the food, the resource will be found (<code>200</code>) but will have a value `false` for the `public` field.</p>"
+      tags:
+       - food
+      parameters:
+      - $ref: '#/components/parameters/cloudMeasure'
+      - $ref: '#/components/parameters/cloudMeasureQualifier'
+      - $ref: '#/components/parameters/servingQty'
+      - $ref: '#/components/parameters/foodServing'
+      responses:
+        '200':
+          description: "The food item. `servings` present only when nutrient-calculating parameters are set."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FoodGet'
+        '404':
+          description: "The food item either does not exist or has not yet been made publicly available."
+    put:
+      summary: "Edit a food"
+      description: "If current user created the food, they may edit it. If the food is public, the changes will be held for moderation."
+      tags:
+      - food
+      responses:
+        '200':
+          description: "The user has permission to edit this food, and the updated state is returned in the content body."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FoodGet'
+        '202':
+          description: "Suggestions queued for moderation. Returned if everything was OK but the user does not have permission to edit this food."
+        '400':
+          description: "Validation errors"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorValidation'
+        '404':
+          description: "The food doesn't exist"
+        '500':
+          $ref: '#/components/responses/InternalError'
+    patch:
+      summary: "Edit a food"
+      description: "If current user created the food, they may edit it. If the food is public, the changes will be held for moderation."
+      tags:
+      - food
+      responses:
+        '200':
+          description: "The user has permission to edit this food, and the updated state is returned in the content body."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FoodGet'
+        '202':
+          description: "Suggestions queued for moderation. Returned if everything was OK but the user does not have permission to edit this food."
+        '400':
+          description: "Validation errors"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorValidation'
+        '404':
+          description: "The food doesn't exist"
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      summary: "Delete a food"
+      description: "Normal users' `DELETE` requests will just flag for moderation."
+      tags:
+      - food
+      responses:
+        '200':
+          description: "Food was deleted."
+        '202':
+          description: "Deletion queued for moderation."
+        '404':
+          description: "Food not found"
+        '500':
+          $ref: '#/components/responses/InternalError'
+        
+  '/food/{foodId}/servings':
+    parameters:
+    - $ref: '#/components/parameters/foodIdPath'
+    get:
+      summary: "Get the serving sizes available for this food"
+      tags:
+      - food
+      responses:
+        '200':
+          description: "A list of the serving sizes available for this food, either  3rd party or (XOR) ours."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FoodServingGet'
+    post:
+      summary: "Suggest a serving size for this food"
+      description: "Allow user to suggest a serving size for this food. Subject to moderation before becoming public. Only available for our foods, not `cloud_food`s."
+      tags:
+      - food
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/OurFoodServing'
+      responses:
+        '202':
+          description: "The serving size suggestions were accepted and are awaiting moderation."
+        '400':
+          description: "Possible for attempting to modify a `cloud_food`, add an already existing serving size, malformed JSON, or malicious text input"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorValidation'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  '/food/{foodId}/servings/{foodServing}':
+    parameters:
+    - $ref: '#/components/parameters/foodIdPath'
+    - $ref: '#/components/parameters/foodServingPath'
+    put:
+      summary: "Suggest changes to a serving size for this food"
+      description: "Allow user to suggest a serving size for this food. Subject to moderation before becoming public. Only available for our foods, not `cloud_food`s."
+      tags:
+      - food
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/OurFoodServing'
+      responses:
+        '202':
+          description: "The serving size suggestions were accepted and are awaiting moderation."
+        '400':
+          description: "Possible for attempting to modify a `cloud_food`, add an already existing serving size, malformed JSON, or malicious text input"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorValidation'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      summary: "Suggest removing a serving size for this food"
+      description: "Allow user to suggest removing a serving size from this food. Subject to moderation before becoming public. Only available for our foods, not `cloud_food`s."
+      tags:
+      - food
+      responses:
+          '202':
+            description: "The serving size removal suggestion was accepted and is awaiting moderation."
+          '400':
+            description: "Attempting to modify a `cloud_food`"
+          '404':
+            description: "Food doesn't exist or user is not logged in"
+          '500':
+            $ref: '#/components/responses/InternalError'  
+  '/food/{foodId}/categories':
+    parameters:
+    - $ref: '#/components/parameters/foodIdPath'
+    get:
+      summary: "Get the categories of which this food is a part"
+      description: "Not extensive. Read-only values."
+      tags:
+      - food
+      parameters:
+      - $ref: '#/components/parameters/limit'
+      - $ref: '#/components/parameters/page'
+      responses:
+        '200':
+          description: "A list of the categories for this food, either 3rd party or ours."
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FoodCategory'
+        '404':
+          description: "The food does not belong to any categories"
+        '500':
+          $ref: '#/components/responses/InternalError'
+  
+  '/food/{foodId}/health_categories':
+    parameters:
+    - $ref: '#/components/parameters/foodIdPath'
+    get:
+      summary: "Get the health categories of which this food is a part"
+      description: "Such as allergens"
+      tags:
+      - food
+      parameters:
+      - $ref: '#/components/parameters/limit'
+      - $ref: '#/components/parameters/page'
+      responses:
+        '200':
+          description: "A list of the health categories for this food, either 3rd party or ours."   
+    
+  '/meals':
+    get:
+      summary: "Get meals and snacks for a time period"
+      description: "Use `from_date` and `to_date` parameters. Default is to return meals for the current day according to UTC."
+      tags:
+      - meals
+      parameters:
+      - $ref: '#/components/parameters/from_date'
+      - $ref: '#/components/parameters/to_date'
+      responses:
+        '200':
+          description: "Meals logged for configured time period"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MealGet'
+        '404':
+          description: "No meals or snacks logged for period."
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      summary: "Create a meal or snack entry"
+      description: "Create one!"
+      tags:
+      - meals
+      requestBody:
+        description: "A meal object"
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MealPost'
+      responses:
+        '201':
+          description: Meal was created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MealGet'
+  '/meals/{mealId}':
+    parameters:
+    - $ref: '#/components/parameters/mealIdPath'
+    get:
+      summary: "Get a meal"
+      description: "A user's meal."
+      tags:
+      - meals
+      responses:
+        '200':
+          description: "A meal object"
+          content:
+            applicaton/json:
+              schema:
+                $ref: '#/components/schemas/MealGet'
+        '404':
+          description: "Meal does not exist"
+        '500':
+          $ref: '#/components/responses/InternalError'
+    put:
+      summary: "Modify a meal"
+      description: "Modify a meal. This supports changing serving amounts for all foods at once."
+      tags:
+      - meals
+      responses:
+        '200':
+          description: "The updated meal object"
+          content:
+            applicaton/json:
+              schema:
+                $ref: '#/components/schemas/MealGet'
+        '404':
+          description: "Meal does not exist"
+        '500':
+          $ref: '#/components/responses/InternalError'
+    patch:
+      summary: "Modify a meal"
+      description: "Modify a meal. This supports modifying multiple serving amounts  at once."
+      tags:
+      - meals
+      responses:
+        '200':
+          description: "The updated meal object"
+          content:
+            applicaton/json:
+              schema:
+                $ref: '#/components/schemas/MealGet'    
+        '404':
+          description: "Meal does not exist"
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      summary: "Delete a meal"
+      description: "Remove a meal from the user's history"
+      tags:
+      - meals
+      responses:
+        '204':
+          description: "Meal was deleted."
+        '404':
+          description: "Meal does not exist"
+        '500':
+          $ref: '#/components/responses/InternalError'
+  '/meals/{mealId}/servings':
+    parameters:
+    - $ref: '#/components/parameters/mealIdPath'
+    get:
+      summary: "Get serving info on foods in this meal"
+      description: "Returns only the food serving info for the meal"
+      tags:
+      - meals
+      responses:
+        '200':
+          description: "a list of the food servings for this meal"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FoodServingQtyMixed'
+        '404':
+          description: "Meal from path was not found."
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      summary: "Add a food serving qty to a meal"
+      description: "Adds serving quantity data for a food to this meal."
+      tags:
+      - meals
+      requestBody:
+        description: "Serving quantities for the specified food. The `type` field is required."
+        content:
+          application/json:
+            schema:
+              anyOf:
+              - $ref: '#/components/schemas/CloudFoodServingQty'
+              - $ref: '#/components/schemas/FoodServingQty'
+      responses:
+        '200':
+          $ref: '#/components/responses/MealServingQty'
+        '400':
+          description: "Something failed validation."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorValidation'
+        '404':
+          description: "Meal from path was not found."
+        '500':
+          $ref: '#/components/responses/InternalError'
+  '/meals/{mealId}/servings/{foodId}':
+    parameters:
+    - $ref: '#/components/parameters/mealIdPath'  
+    - $ref: '#/components/parameters/foodIdPath'
+    get:
+      summary: "Nutrition for this food given its serving size"
+      description: "Get a specific food's nutrition info given current serving size in meal"
+      tags:
+      - meals
+      responses:
+        '200':
+          $ref: '#/components/responses/MealServingQty'
+        '404':
+          description: "Meal and/or Food from path were not found."
+        '500':
+          $ref: '#/components/responses/InternalError'
+    put:
+      summary: "Overwrite a food serving qty for a meal"
+      description: "Overwrites serving quantity data for this food in this meal."
+      tags:
+      - meals
+      requestBody:
+        description: "Serving quantities for the specified food. The `type` field is required."
+        content:
+          application/json:
+            schema:
+              anyOf:
+              - $ref: '#/components/schemas/CloudFoodServingQty'
+              - $ref: '#/components/schemas/FoodServingQty'
+      responses:
+        '200':
+          $ref: '#/components/responses/MealServingQty'
+        '400':
+          description: "Something failed validation."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorValidation'
+        '404':
+          description: "Meal and/or Food from path were not found."
+        '500':
+          $ref: '#/components/responses/InternalError'
+    patch:
+      summary: "Modify a food serving qty for a meal"
+      description: "Changes whatever serving quantity data is included in the request for this food in this meal."
+      tags:
+      - meals
+      requestBody:
+        description: "Serving quantities for the specified food. The `type` field is required."
+        content:
+          application/json:
+            schema:
+              anyOf:
+              - $ref: '#/components/schemas/CloudFoodServingQty'
+              - $ref: '#/components/schemas/FoodServingQty'
+      responses:
+        '200':
+          $ref: '#/components/responses/MealServingQty'
+        '400':
+          description: "Something failed validation."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorValidation'
+        '404':
+          description: "Meal and/or Food from path were not found."
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      summary: "Remove food from meal"
+      description: "Deletes whatever serving quantity data is associated with this meal, effectively removing the food from the meal."
+      tags:
+      - meals
+      responses:
+        '204':
+          description: "Food successfully deleted. Idempotent; multiple calls will return 204."
+        '404':
+          description: "Meal and/or Food from path were not found."
+        '500':
+          $ref: '#/components/responses/InternalError'
+  '/user/{userId}/logs':
+    parameters:
+    - $ref: '#/components/parameters/userIdPath'
+    get:
+      summary: "Log days for this user"
+      description: "List of the log_day collection for this user."
+      tags:
+      - log_days
+      parameters:
+      - $ref: '#/components/parameters/from_date_required'
+      - $ref: '#/components/parameters/to_date'
+      responses:
+        '200':
+          description: "A collection of user logs"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LogDayGet'
+        '404':
+          description: "No logs found."
+    post:
+      summary: "Create a log day for a user"
+      description: "Create a log day for a user."
+      tags:
+      - log_days
+      requestBody:
+        description: "The log day info"
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogDayGet'
+      responses:
+        '200':
+          description: "Log day sucessfully created."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogDayGet'
+        '400':
+          description: "Date and user might already have log day associated with them, along with the usual formatting, etc."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorValidation'
+                
+      
+  '/user/{userId}/logs/{logDayId}':
+    parameters:
+    - $ref: '#/components/parameters/userIdPath'
+    - $ref: '#/components/parameters/logDayIdPath'
+    get:
+      summary: "Notes on a user's day"
+      description: "Summary data from the log day and user-entered meta data like notes. Quite likely a hub of algorithmic analysis of the user's eating habits in later versions."
+      tags:
+      - log_days
+      responses:
+        '200':
+          description: "The log day was found"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogDayGet'
+        '404':
+          description: "Not found"
+    put:
+      summary: "Replace a log day for a user"
+      description: "Replace a log day for a user."
+      tags:
+      - log_days
+      requestBody:
+        description: "The log day info"
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogDayGet'
+      responses:
+        '200':
+          description: "Log day sucessfully replaced."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogDayGet'
+        '400':
+          description: "Formatting, etc."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorValidation'
+    patch:
+      summary: "Edit a log day for a user."
+      description: "Edit part of a log day. Most often this will be to update the amount of water the user has drunk."
+      tags:
+      - log_days
+      requestBody:
+        description: "The log day info"
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogDayGet'
+      responses:
+        '200':
+          description: "Log day sucessfully replaced."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogDayGet'
+        '400':
+          description: "Date and user might already have log day associated with them, along with the usual formatting, etc."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorValidation'
+    delete:
+      summary: "Remove a log day"
+      description: "Soft-delete the log day"
+      tags:
+      - log_days
+      responses:
+        '204':
+          description: "Log day sucessfully removed."
+        '404':
+          description: "User or log day not found"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorValidation'
+
+components:
+  schemas:
+    created_at:
+      type: string
+      format: datetime
+      description: The time at which the resource was created
+      example: "2020-07-23T18:25:43.511Z"
+    updated_at:
+      type: string
+      format: datetime
+      description: The time at which the resource was last updated
+      example: "2020-07-23T18:25:43.511Z"
+    deleted_at:
+      type: string
+      format: datetime
+      description: The time at which the resource was soft-deleted
+      example: "2020-07-30T18:25:43.511Z"
+    tokenGrant:
+      type: object
+      properties:
+        token_type:
+          type: string
+          example: "bearer"
+        access:
+          type: string
+          description: "Access token"
+        refresh:
+          type: string
+          description: "Refresh token"
+        expires_in:
+          type: integer
+          description: "Expiration time in seconds"
+    UserId:
+      type: integer
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+        f_name:
+          type: string
+        l_name:
+          type: string
+        email:
+          type: string
+    UserCreate:
+      type: object
+      required:
+        - f_name
+        - l_name
+        - email
+        - password
+        - repeat_password
+      properties:
+        f_name:
+          type: string
+          minLength: 1
+        l_name:
+          type: string
+          minLength: 1
+        email:
+          type: string
+          description: Must be a valid email address with a TLD (e.g. ".com")
+        password:
+          type: string
+          minLength: 10
+          maxLength: 18
+        repeat_password:
+          type: string
+          minLength: 10
+          maxLength: 18
+          description: Must match `password` attribute exactly
+      example: {
+        "f_name": "Fluffy",
+        "l_name": "Hicks",
+        "email": "fluffy@cat.com",
+        "password": "rabbit",
+        "repeat_password": "rabbit"
+      }
+    UserPatch:
+      type: object
+      properties:
+        f_name:
+          type: string
+          minLength: 1
+        l_name:
+          type: string
+          minLength: 1
+        email:
+          type: string
+          description: Must be a valid email address with a TLD (e.g. ".com")
+        password:
+          type: string
+          minLength: 10
+          maxLength: 18
+        repeat_password:
+          type: string
+          minLength: 10
+          maxLength: 18
+          description: Must match `password` attribute exactly
+      example: {
+        "password": "squirrel",
+        "repeat_password": "squirrel"
+      }
+    Goal:
+      type: object
+      properties:
+        type:
+          type: string
+          default: "user_goal"
+        nutrient_goals:
+          $ref: '#/components/schemas/NutrientQtyMap'
+    GoalPut:
+      type: array
+      items:
+        $ref: '#/components/schemas/NutrientQtyMap'
+    NutrientQtyMap:
+      type: object
+      properties:
+        KCAL:
+          type: number
+          example: 52
+        FAT:
+          type: number
+          example: 0.17
+        CARBS:
+          type: number
+          example: 13.81
+        PROT:
+          type: number
+          example: 0.26
+        FIBER:
+          type: number
+          example: 2.4
+    ArrayUserGoalDelta:
+      type: array
+      items:
+        $ref: '#/components/schemas/UserGoalDelta'
+    UserGoalDelta:
+      type: object
+      properties:
+        user:
+          type: integer
+        nutrient:
+          type: integer
+        date_time:
+          type: string
+          format: date-time
+        previous_amount:
+          type: number
+        new_amount:
+          type: number
+    UserMealTimeGet:
+      type: object
+      properties:
+        type:
+          type: string
+          example: "meal_time"
+        id:
+          type: integer
+          example: 3
+        time:
+          type: integer
+          description: "The time of day in minutes. 0 < meal_time < 1439, Midnight = 0."
+          minimum: 0
+          maximum: 1439
+          example: 750
+        title:
+          type: string
+          description: "Name of meal, e.g. 'lunch'"
+          example: lunch
+        snack:
+          type: boolean
+          description: Whether this meal is a snack
+          default: false
+        created_at:
+          $ref: '#/components/schemas/created_at'
+        updated_at:
+          $ref: '#/components/schemas/updated_at'
+        deleted_at:
+          $ref: '#/components/schemas/deleted_at'
+    UserMealTimePut:
+      type: object
+      properties:
+        meal_time:
+          type: integer
+          description: "The time of day in minutes. 0 < meal_time < 1439, Midnight = 0."
+          example: 750
+        meal_title:
+          type: string
+          description: "Name of meal, e.g. 'lunch'"
+          example: lunch
+        snack:
+          type: boolean
+          description: Whether this meal is a snack
+          default: false
+    LogDayId:
+      type: integer
+      description: "Identifier for a `log_day`"
+    LogDay:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        user_notes:
+          type: string
+        water_oz:
+          type: integer
+          description: "Amount of water the user drank on this day"
+    LogDayGet:
+      allOf:
+      - type: object
+        properties:
+          id:
+            $ref: '#/components/schemas/LogDayId'
+      - $ref: '#/components/schemas/LogDay'
+  
+    GoalTemplate:
+      type: object
+      properties:
+        type:
+          type: string
+          description: "user_goal_template"
+        start_date:
+          type: string
+          format: date-time
+        nice_name:
+          type: string
+          description: The title for this goal
+        desc:
+          type: string
+          description: The description of this goal
+        nutrient_goals:
+          $ref: "#/components/schemas/Goal"
+    FoodId:
+      oneOf:
+      - type: integer
+        example: 41
+      - $ref: '#/components/schemas/EdFoodId'
+    upc:
+      type: string
+    FoodCategory:
+      type: object
+      properties:
+        type:
+          type: string
+          default: "food_category"
+        id:
+          type: integer
+        label:
+          type: string
+        display_label:
+          type: string
+        description:
+          type: string
+    HealthCategoryId:
+      type: integer
+      description: "`health_category` id"
+      example: 16
+    HealthCategory:
+      type: object
+      properties:
+        type:
+          type: string
+          default: "health_category"
+        id:
+          type: integer
+        label:
+          type: string
+        display_label:
+          type: string
+        description:
+          type: string
+        
+    Food:
+      type: object
+      properties:
+        type:
+          type: string
+          example: "food"
+          default: "food"
+        upc:
+          $ref: '#/components/schemas/upc'
+        title:
+          type: string
+        serving_sizes:
+          type: array
+          items:
+            $ref: '#/components/schemas/OurFoodServing'
+        categories:
+          type: array
+          items:
+            oneOf:
+            - type: integer
+              description: Food category id
+            - $ref: '#/components/schemas/FoodCategory'
+        health_categories:
+          type: array
+          items:
+            oneOf:
+            - $ref: '#/components/schemas/HealthCategoryId'
+            - $ref: '#/components/schemas/HealthCategory'
+    FoodGet:
+      allOf:
+      - type: object
+        properties:
+          id:
+            $ref: '#/components/schemas/FoodId'
+          nutrients:
+            $ref: '#/components/schemas/FoodMixedGetNutrients'
+          servings:
+            $ref: '#/components/schemas/FoodServingQty'
+      - $ref: '#/components/schemas/Food'
+    FoodPost:
+      allOf:
+      - type: object
+        properties:
+          nutrition_facts:
+            allOf:
+            - description: "Unless `serving` specifies otherwise, nutrients are per 100 grams."
+            - $ref: '#/components/schemas/NutrientQtyMap'
+            
+          
+      - $ref: '#/components/schemas/Food'
+    FoodMixedGetNutrients:
+      type: object
+      properties:
+        serving_size_used:
+          $ref: '#/components/schemas/FoodServingId'
+        list:
+          allOf:
+          - description: "Unless `serving` specifies otherwise, nutrients are per 100 grams."
+          - $ref: '#/components/schemas/NutrientQtyMap'
+    CloudFood:
+      type: object
+      properties:
+        type:
+          type: string
+          example: "cloud_food"
+          default: "cloud_food"
+        id:
+          $ref: '#/components/schemas/EdFoodId'
+        upc:
+          $ref: '#/components/schemas/upc'
+        title:
+          type: string
+        brand:
+          $ref: '#/components/schemas/EdBrand'
+        image:
+          type: string
+          format: url
+        nutrients:
+          $ref: '#/components/schemas/NutrientQtyMap'
+        categories:
+          type: array
+          items:
+            allOf:
+            - $ref: '#/components/schemas/foodCategoryId'
+            - $ref: '#/components/schemas/FoodCategory'
+        health_categories:
+          type: array
+          items:
+            allOf:
+            - type: integer
+              description: "`health_category` id"
+            - $ref: '#/components/schemas/HealthCategory'
+        cloud_serving_sizes:
+          type: array
+          description: Contains serving size information for packaged foods as listed on the packaging label 
+          items:
+            $ref: '#/components/schemas/EdServingSize'
+        cloud_available_measures:
+          type: array
+          items:
+            $ref: '#/components/schemas/EdMeasure'
+    FoodListMixed:
+      type: array
+      items:
+          anyOf:
+          - $ref: '#/components/schemas/CloudFood'
+          - $ref: '#/components/schemas/Food'
+
+    FoodSearchResult:
+      type: object
+      properties:
+        nlp:
+          type: object
+          properties:
+            query:
+              type: string
+              description: "The search phrase. Present only if searching with `phrase` parameter"
+            success:
+              type: boolean
+              description: "Whether NLP was possible for this search (from Edamam)"
+        results:
+          $ref: '#/components/schemas/FoodListMixed'
+    foodCategoryId:
+      type: integer
+      minimum: 1
+      description: The ID of a `food_category`
+    foodCategoryLabel:
+      type: string
+      minLength: 2
+      format: lowercase
+      description: The label for a food category.
+    MealId:
+      type: integer
+      example: 41
+    Meal:
+      type: object
+      properties:
+        datetime:
+          type: string
+          format: datetime
+        user_mealtime:
+          type: integer
+          description: "Reference to what the user calls this meal, a `user_mealtime` object. e.g., lunch."
+        notes:
+          type: string
+        dine_out:
+          type: boolean
+          description: "Value of true indicates this meal was eaten at a restaurant"
+        snack:
+          type: boolean
+          description: "Value of true indicates this is a snack"
+        portions:
+            type: array
+            items:
+              $ref: '#/components/schemas/FoodServingQtyMixed'
+    MealGet:
+      allOf:
+      - type: object
+        properties:
+          id:
+            $ref: '#/components/schemas/MealId'
+          type:
+            type: string
+            example: "meal"
+          foods:
+            oneOf:
+            - $ref: '#/components/schemas/FoodListMixed'
+            - type: array
+              items:
+                $ref: '#/components/schemas/FoodId'
+          total_nutrients:
+            $ref: '#/components/schemas/NutrientQtyMap'
+      - $ref: '#/components/schemas/Meal'
+    MealPost:
+      $ref: '#/components/schemas/Meal'
+          
+    Error:
+      description: "Errors as defined by Restify"
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+
+    ErrorValidation:
+      allOf:
+      - $ref: '#/components/schemas/Error'
+      - type: object
+        properties:
+          validation:
+            description: "An array of Joi `ValidationErrorItem`s"
+            type: array
+            items:
+              type: object
+              properties:
+                message:
+                  type: string
+                path:
+                  type: array
+                  items:
+                    type: string
+                type:
+                  type: string
+                context:
+                  type: object
+                  properties:
+                    label:
+                      type: string
+                    key:
+                      type: string
+
+
+    EdFoodId:
+      type: string
+      description: Edamam's unique food identifier
+      example: "food_bnbh4ycaqj9as0a9z7h9xb2wmgat"
+    EdLabel:
+      type: string 
+      description: Display label
+    EdBrand:
+      type: string
+      description: "For example brand 'Burger King' for the item 'hamburger'"
+      example: "Burger King"
+
+    EdServingSize:
+      type: object
+      description: "Contains serving size information for packaged foods as listed on the packaging label"
+      properties:
+        uri:
+          $ref: '#/components/schemas/EdMeasureURI'
+        label:
+          type: string
+          description: Serving size label
+        quantity:
+          type: number
+    EdMeasureURI:
+      type: string
+      description: URI to Edamam's Measure
+      example: "http://www.edamam.com/ontologies/edamam.owl#Measure_unit"
+    EdMeasureShort:
+      type: string
+      description: The end of the Edamam URI
+      example: "Measure_unit"
+    EdMeasure:
+      type: object
+      properties:
+        uri:
+          $ref: '#/components/schemas/EdMeasureURI'
+        label:
+          $ref: '#/components/schemas/EdLabel'
+    EdMeasureQualifier:
+      type: string
+      format: ed_measure_qualifier
+      example: "http://www.edamam.com/ontologies/edamam.owl#Qualifier_large"
+    EdMeasureQualifierShort:
+      type: string
+      format: ed_measure_qualifier_short
+      example: "Qualifier_large"
+
+    FoodServingId:
+      type: integer
+      example: 13
+
+    CloudFoodServing:
+      type: object
+      properties:
+        measure:
+          type: object
+          properties:
+            uri:
+              $ref: '#/components/schemas/EdMeasureShort'
+            label:
+              type: string
+            weight:
+              type: number
+        qualifier:
+          $ref: '#/components/schemas/EdMeasureQualifier'
+        serving_size:
+          $ref: '#/components/schemas/EdServingSize'
+    OurFoodServing:
+      type: object
+      properties:
+        label:
+          type: string
+        weight:
+          type: number
+          description: "The weight of this serving size in grams"
+        increment_by:
+          type: number
+          description: "The amount by which to allow the user to increment servings, e.g. 0.25 to allow the user to increase servings in this amount by a quarter."
+    OurFoodServingGet:
+      allOf:
+      - $ref: '#/components/schemas/FoodServingId'
+      - $ref: '#/components/schemas/OurFoodServing'
+    FoodServingGet:
+      oneOf:
+      - $ref: '#/components/schemas/OurFoodServingGet'
+      - $ref: '#/components/schemas/CloudFoodServing'  
+      
+    FoodServingQty:
+      type: object
+      properties:
+        type:
+          type: string
+          example: "food_serving_qty"
+        quantity:
+          type: number
+          example: 1
+        food:
+          $ref: '#/components/schemas/FoodId'
+        serving:
+          $ref: '#/components/schemas/FoodServingId'
+    CloudFoodServingQty:
+      type: object
+      properties:
+        type:
+          type: string
+          example: "cloud_food_serving_qty"
+        quantity:
+          type: number
+          example: 1
+        cloud_food_measure:
+          $ref: '#/components/schemas/EdMeasureShort'
+        cloud_food:
+          $ref: '#/components/schemas/EdFoodId'
+        qualifier:
+          $ref: '#/components/schemas/EdMeasureQualifier'
+    FoodServingQtyMixed:
+      anyOf:
+      - $ref: '#/components/schemas/FoodServingQty'
+      - $ref: '#/components/schemas/CloudFoodServingQty'
+
+
+      
+  parameters:
+    from_date:
+      in: query
+      name: from_date
+      description: "Pointer-based pagination, oldest. Format as <a href= 'https://tools.ietf.org/html/rfc3339#section-5.6' >RFC 3339, section 5.6</a>, for example, 2020-07-21"
+      schema:
+        type: string
+        format: date
+    to_date:
+      in: query
+      name: to_date
+      description: "Pointer-based pagination, newest. Format per <a href= 'https://tools.ietf.org/html/rfc3339#section-5.6' >RFC 3339, section 5.6</a>, for example, 2020-07-21"
+      schema:
+        type: string
+        format: date
+        default: today's date
+    from_date_required:
+      in: query
+      name: from_date
+      required: true
+      description: "Pointer-based pagination, oldest. Format as <a href= 'https://tools.ietf.org/html/rfc3339#section-5.6' >RFC 3339, section 5.6</a>, for example, 2020-07-21"
+      schema:
+        type: string
+        format: date
+    to_date_required:
+      in: query
+      name: to_date
+      required: true
+      description: "Pointer-based pagination, newest. Format as <a href= 'https://tools.ietf.org/html/rfc3339#section-5.6' >RFC 3339, section 5.6</a>, for example, 2020-07-21"
+      schema:
+        type: string
+        format: date
+    limit:
+      in: query
+      name: limit
+      schema:
+        type: integer
+      description: "The number of items to return per page. If pagination is date-based, this is ignored."
+    page:
+      in: query
+      name: page
+      schema:
+        type: integer
+      example: 1
+      description: "The page number/offset to apply to paginated results. Respects `limit` parameter. Default is 1."
+    show_deleted:
+      in: query
+      name: show_deleted
+      schema:
+        type: boolean
+      description: Whether to show soft-delted resources
+    expand:
+      in: header
+      name: X-Expand
+      description: The path of the object(s) to expand, singular or array (e.g., for `/goals`, `nutrient_goals.nutrient` to expand objects in an array). Inspired by [Stripe's expanding objects](https://stripe.com/docs/api/expanding_objects)
+      schema:
+        type: array
+        items:
+          type: string
+    userIdPath:
+      name: userId
+      in: path
+      required: true
+      description: The id of the relevant user resource
+      schema:
+        $ref: '#/components/schemas/UserId'
+    mealIdPath:
+      name: mealId
+      in: path
+      required: true
+      description: "The id of the meal"
+      schema:
+        $ref: '#/components/schemas/MealId'
+    
+    mealTimeIdPath:
+      name: mealTimeId
+      in: path
+      required: true
+      description: The id of the user's meal time description
+      schema:
+        type: integer
+        minimum: 1
+    logDayIdPath:
+      name: logDayId
+      in: path
+      required: true
+      description: The ID of this user's log day
+      schema:
+        $ref: '#/components/schemas/LogDayId'
+    foodIdPath:
+      name: foodId
+      in: path
+      required: true
+      description: The id of the relevant food
+      schema:
+        oneOf:
+        - $ref: '#/components/schemas/EdFoodId'
+        - $ref: '#/components/schemas/FoodId'
+    foodSearchphrase:
+      name: food_phrase
+      in: query
+      required: false
+      description: Keyword(s) to use in a search request. See other params for context.
+      schema:
+        type: string
+    foodSearchPaired:
+      name: pairs_with
+      in: query
+      required: false
+      description: Limit search results to foods that have appeared in the same meal as a specific food.
+      schema:
+        $ref: '#/components/schemas/FoodId'
+    foodCategoriesIds:
+      name: cat_ids
+      in: query
+      required: false
+      description: an array of categories of which results must be a part
+      schema:
+        type: array
+        items: 
+          $ref: '#/components/schemas/foodCategoryId'
+    foodCategoryLabels:
+      name: cat_labels
+      in: query
+      required: false
+      description: an array of categories of which results must be a part
+      example: ['lunch','mexican']
+      schema:
+        type: array
+        items:
+          $ref: '#/components/schemas/foodCategoryLabel'
+    foodServing:
+      name: serving
+      in: query
+      description: "The food serving label/scalar to use against the canonical serving size when calculating nutrients a `food` response."
+      schema:
+        $ref: '#/components/schemas/FoodServingId'
+    foodServingPath:
+      name: foodServing
+      in: path
+      required: true
+      description: "The food serving to use in relation to this resource"
+      schema:
+        $ref: '#/components/schemas/FoodServingId'
+    servingQty:
+      name: serving_qty
+      in: query
+      required: true
+      description: "The quantity of servings when calculating nutrients for _either_ a `food` or `cloud_food` response. Required for calculating nutrients."
+      schema:
+        type: number
+    cloudMeasure:
+      name: ed_measure
+      in: query
+      required: true
+      description: "The measure to use, selected by user. Required iff resource is a `cloud_food`"
+      schema:
+        anyOf:
+        - $ref: '#/components/schemas/EdMeasureShort'
+        - $ref: '#/components/schemas/FoodServingId'
+    cloudMeasureQualifier:
+      name: ed_measure_qual
+      in: query
+      required: true
+      description: "The measure qualifier to use, selected by user. Required iff resource is a `cloud_food`"
+      schema:
+        $ref: '#/components/schemas/EdMeasureQualifierShort'
+    edIngr:
+      name: ingr
+      in: query
+      required: true
+      schema:
+        type: string
+      description: A keyword search parameter to be found in the food name. Not quired when `upc` is present
+    edUpc:
+      name: upc
+      in: query
+      required: true
+      schema:
+        type: string
+      description: A valid UPC code. Not required when `ingr` is present.
+    edNutritionType:
+      name: nutrition-type
+      in: query
+      required: false
+      example: logging
+      schema:
+        type: string
+      description: foodlogger defaults to `logging` to turn on the food logging feature.
+    edHealth:
+      name: health
+      in: query
+      required: false
+      schema:
+        type: string
+        format: edamam_enum
+      description: "Takes one and only one of the API Parameter labels from \"Nutritional Label Definitions\" [@ Edamam](https://developer.edamam.com/food-database-api-docs)"
+    edCategory:
+      name: category
+      in: query
+      required: false
+      schema:
+        type: string
+        format: edamam_cats
+      description: "Category as - `generic-foods`, `generic-meals`, `fast-foods`"
+    edCategoryLabel:
+      name: categorylabel
+      in: query
+      required: false
+      schema:
+        type: string
+        format: edamam_item_type
+      description: "Item type as `food` or `meal`" 
+  responses:
+    NotAuthorized:
+      description: Not authorized. Caller has not authenticated. Returns the same __regardless of resource presence__
+    Forbidden:
+      description: Forbidden. Authenticated user is attempting to access a resource that does not belong to them, __regardless of resource presence__
+    NotFoundGoalDeltas:
+      description: __User authenticates__, but no resources are present.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/UserGoalDelta'
+          example: []
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    MealServingQty:
+      description: "The new nutrient information for this food given the serving size within the meal. A client could calculate this for our foods, but the response here is absolutely necessary for `cloud_food`s, as their serving size information is opaque to us."
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              servings:
+                $ref: '#/components/schemas/FoodServingQtyMixed'
+              nutrition:
+                $ref: '#/components/schemas/NutrientQtyMap'
+
+  examples:
+    EmptyArray:
+      value: []
+    ErrNoReqBody:
+     value: {"type": "error", "cause": "no_req_body"}
+
+    Goal:
+      value: {
+        "type": "user_goal",
+        "nutrient_goals": [
+          {
+            "type": "nutrient",
+            "nutrient": 1,
+            "daily_value": 2000
+          },
+          {
+            "type": "nutrient",
+            "nutrient": 2,
+            "daily_value": 300
+          },
+          {
+            "type": "nutrient",
+            "nutrient": 3,
+            "daily_value": 56
+          },
+          {
+            "type": "nutrient",
+            "nutrient": 4,
+            "daily_value": 50
+          },
+          {
+            "type": "nutrient",
+            "nutrient": 5,
+            "daily_value": 25
+          }
+        ]
+      }
+    GoalExpanded:
+      value: {
+          "type": "user_goal",
+          "nutrient_goals": [
+            {
+              "nutrient": {
+                "id": 1,
+                "type": "nutrient",
+                "name": "calories",
+                "short_name": "calories",
+                "canonical_units": "kcal"
+              },
+              "daily_value": 2000
+            },
+            {
+              "nutrient": {
+                "id": 2,
+                "type": "nutrient",
+                "name": "carbohydrates",
+                "short_name": "carbs",
+                "canonical_units": "g"
+              },
+              "daily_value": 300
+            },
+            {
+              "nutrient": {
+                "id": 3,
+                "type": "nutrient",
+                "name": "protein",
+                "short_name": "protein",
+                "canonical_units": "g"
+              },
+              "daily_value": 56
+            },
+            {
+              "nutrient": {
+                "id": 4,
+                "type": "nutrient",
+                "name": "fats",
+                "short_name": "fats",
+                "canonical_units": "g"
+              },
+              "daily_value": 50
+            },
+            {
+              "nutrient": {
+                "id": 5,
+                "type": "nutrient",
+                "name": "fiber",
+                "short_name": "fiber",
+                "canonical_units": "g"
+              },
+              "daily_value": 25
+            }
+          ]
+        }
+    goal_template:
+      value: {
+        "type": "user_goal_template",
+        "nice_name": "Track macronutrients on 2kcal/day diet",
+        "desc": "A standard, 2,000 calorie diet",
+        "nutrient_goals": [
+          {
+            "type": "nutrient_goal",
+            "nutrient": {
+              "id": 1,
+              "type": "nutrient",
+              "name": "calories",
+              "short_name": "calories",
+              "canonical_units": "kcal"
+            },
+            "daily_value": 2000
+          },
+          {
+            "type": "nutrient_goal",
+            "nutrient": {
+              "id": 2,
+              "type": "nutrient",
+              "name": "carbohydrates",
+              "short_name": "carbs",
+              "canonical_units": "g"
+            },
+            "daily_value": 300
+          },
+          {
+            "type": "nutrient_goal",
+            "nutrient": {
+              "id": 3,
+              "type": "nutrient",
+              "name": "protein",
+              "short_name": "protein",
+              "canonical_units": "g"
+            },
+            "daily_value": 56
+          },
+          {
+            "type": "nutrient_goal",
+            "nutrient": {
+              "id": 4,
+              "type": "nutrient",
+              "name": "fats",
+              "short_name": "fats",
+              "canonical_units": "g"
+            },
+            "daily_value": 50
+          },
+          {
+            "type": "nutrient_goal",
+            "nutrient": {
+              "id": 5,
+              "type": "nutrient",
+              "name": "fiber",
+              "short_name": "fiber",
+              "canonical_units": "g"
+            },
+            "daily_value": 25
+          }
+        ]
+      }
+    user_goal_delta_not_expanded:
+      value: {
+        "type": "goal_delta",
+        "user": 1,
+        "nutrient": 4,
+        "date_time": "2012-04-23T18:25:43.511Z",
+        "previous_amount": 52.5,
+        "new_amount": 45
+      }
+ 
+
+externalDocs:
+  description: Project GitHub
+  url: 'https://github.com/john-hix/foodlogger-backend'
+ 

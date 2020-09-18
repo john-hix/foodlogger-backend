@@ -1,0 +1,40 @@
+# This Compose file is for development purposes only
+version: '3.1'
+services:
+  db:
+    image: postgres
+    restart: always
+    environment:
+      POSTGRES_USER: foodapp
+      POSTGRES_DB: foodapp_dev
+      POSTGRES_PASSWORD: password
+    volumes:
+      - './docker/db/pgdata:/var/lib/postgresql/data'
+      # - './db/init-test-dbs.sql:/docker-entrypoint-initdb.d'
+    ports:
+      - 5432:5432
+  redis:
+    image: redis:6.0.6-alpine
+    restart: always
+    ports:
+    - 6379:6379
+    volumes:
+    - './docker/redis/data:/data'
+    - './docker/redis/redis.conf:/usr/local/etc/redis/redis.conf'
+  # Development tools
+  pgadmin:
+    image: dpage/pgadmin4
+    environment:
+      PGADMIN_DEFAULT_EMAIL: john@example.com
+      PGADMIN_DEFAULT_PASSWORD: password
+    ports:
+      - 8080:80
+  swagger-editor:
+    image: swaggerapi/swagger-editor
+    ports:
+      - 3001:8080
+  post-woman:
+    image: liyasthomas/postwoman
+    ports:
+      - 3050:3000
+
